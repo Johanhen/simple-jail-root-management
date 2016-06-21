@@ -21,6 +21,8 @@ release=""
 architecture=""
 verbose=0
 dryrun=0
+mirror="ftp://ftp.freebsd.org"
+packages="base lib32"
 
 # parse options
 while getopts "a:nr:v" opt; do
@@ -74,6 +76,15 @@ echo_verbose "Target directory: $target_directory"
 if test ! -d "$target_directory"; then 
 	echo "ERROR: target directory '$target_directory' does not exist"
 	exit 2
+fi
+
+echo_verbose "Mirror: $mirror"
+
+if [ $verbose -ne 0 ]; then
+	echo_verbose "Packages:"
+	for package in $packages; do
+		echo_verbose " - $package"
+	done
 fi
 
 if [ $dryrun -ne 0 ]; then
