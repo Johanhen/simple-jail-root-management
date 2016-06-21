@@ -135,5 +135,14 @@ for package in $packages; do
 	verify_checksum "$package.txz" "$tmp_dir"
 done
 
+for package in $packages; do
+	echo "Extracting $package"
+	tar xf "$tmp_dir/$package.txz" -C "$target_directory" 
+	if [ $? -ne 0 ]; then
+		echo_stderr "Unable to extract $tmp_dir/$package.txz"
+		exit 5
+	fi
+done
+
 
 

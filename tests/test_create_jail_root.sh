@@ -66,13 +66,24 @@ assert "$CMD" "Release: 10.3-RELEASE\nArchitecture: amd64\nTarget directory: $TE
 
 assert_end '"Parmeters are parsed correctly"'
 
+FTP_DIR="ftp://ftp.de.freebsd.org/pub/FreeBSD/releases/amd64/amd64/10.3-RELEASE"
 
 CMD="$BIN/create_jail_root -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
-FTP_DIR="ftp://ftp.de.freebsd.org/pub/FreeBSD/releases/amd64/amd64/10.3-RELEASE"
 assert_grep "$CMD" "Downloading $FTP_DIR/MANIFEST" "Downloading $FTP_DIR/base.txz" "Downloading $FTP_DIR/lib32.txz"
+assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/MANIFEST"
+assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/base.txz"
+assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/lib32.txz"
 
 assert_end '"Correct package sets are downloaded"'
 
+
+
+CMD="$BIN/create_jail_root -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
+assert_grep "$CMD" "Extracting base" "Extracting lib32"
+assert_raises "test -f \"$TEST_ROOT/new_root/sbin/sha256\""
+assert_raises "test -f \"$TEST_ROOT/new_root/usr/lib32/libc.so\""
+
+assert_end '"Packages have been extracted"'
 
 
 
