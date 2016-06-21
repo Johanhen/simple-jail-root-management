@@ -16,13 +16,44 @@ show_usage_and_exit ()  {
 	exit 1
 }
 
+
+download_file () {
+	url=$1
+	output_dir=$2
+	echo "Downloading $1"
+	fetch -q -m -o "$output_dir" "$url" 
+	if [ $? -ne 0 ]; then
+		echo_stderr "Unable to download $1"
+		exit 3
+	fi
+
+}
+
+verify_checksum () {
+	packagefile=$1
+	dir=$2
+	echo "Verifying checksum for $packagefile"
+	checksum=$(grep $packagefile "$dir/MANIFEST"|cut -f 2)
+	if [ $? -ne 0 -o -z "$checksum" ]; then
+		echo_stderr "Unable to find checksum for $packagefile in $dir/MANIFEST"
+		exit 4
+	fi
+	new_checksum=$(/sbin/sha256 -q -c $checksum "$dir/$packagefile")
+	if [ $? -ne 0 ]; then
+		echo_stderr "Computed checksum $new_checksum does not match expected checksum $checksum - aborting"
+		exit 4
+	fi
+
+}
+
 target_directory=""
 release=""
 architecture=""
 verbose=0
 dryrun=0
-mirror="ftp://ftp.freebsd.org"
+mirror="ftp://ftp.de.freebsd.org"
 packages="base lib32"
+cache_dir=/var/tmp
 
 # parse options
 while getopts "a:nr:v" opt; do
@@ -91,3 +122,18 @@ if [ $dryrun -ne 0 ]; then
 	echo "Dry run only - not doing anything"
 	exit 0
 fi
+
+
+
+ftp_dir="$mirror/pub/FreeBSD/releases/$architecture/$architecture/$release"
+tmp_dir="$cache_dir/$architecture/$release"
+mkdir -p "$tmp_dir"
+
+download_file "$ftp_dir/MANIFEST" "$tmp_dir"
+for package in $packages; do
+	download_file "$ftp_dir/$package.txz" "$tmp_dir"
+	verify_checksum "$package.txz" "$tmp_dir"
+done
+
+
+

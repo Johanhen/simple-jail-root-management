@@ -62,13 +62,14 @@ assert_end '"fail and display error message if target directory does not exist"'
 mkdir "$TEST_ROOT/new_root"
 CMD="$BIN/create_jail_root -n -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
 assert_raises "$CMD" 0
-assert "$CMD" "Release: 10.3-RELEASE\nArchitecture: amd64\nTarget directory: $TEST_ROOT/new_root\nMirror: ftp://ftp.freebsd.org\nPackages:\n - base\n - lib32\nDry run only - not doing anything"
+assert "$CMD" "Release: 10.3-RELEASE\nArchitecture: amd64\nTarget directory: $TEST_ROOT/new_root\nMirror: ftp://ftp.de.freebsd.org\nPackages:\n - base\n - lib32\nDry run only - not doing anything"
 
 assert_end '"Parmeters are parsed correctly"'
 
 
 CMD="$BIN/create_jail_root -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
-assert_grep "$CMD" ".*ackages:" " - base" " - lib32"
+FTP_DIR="ftp://ftp.de.freebsd.org/pub/FreeBSD/releases/amd64/amd64/10.3-RELEASE"
+assert_grep "$CMD" "Downloading $FTP_DIR/MANIFEST" "Downloading $FTP_DIR/base.txz" "Downloading $FTP_DIR/lib32.txz"
 
 assert_end '"Correct package sets are downloaded"'
 
