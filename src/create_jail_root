@@ -1,0 +1,61 @@
+#!/bin/sh
+
+echo_stderr () {
+	echo "$*" >&2
+}
+
+show_usage_and_exit ()  {
+	echo_stderr "Usage: $0 <target-directory>"
+	exit 1
+}
+
+target_directory=""
+release=""
+architecture=""
+
+# parse options
+while getopts "a:r:" opt; do
+	case $opt in
+		a)
+			architecture="$OPTARG"
+			;;
+		r)
+			release="$OPTARG"
+			;;
+		\?)
+			show_usage_and_exit
+			;;
+		:)
+			echo_stderr "Option -$OPTARG requires an argument."
+			show_usage_and_exit
+			;;
+	esac
+done
+
+shift "$((OPTIND-1))" # Shift off the options and optional --.
+
+if [ $# -eq 1 ]; then
+	target_directory=$1
+fi
+
+if [ -z "$release" ]; then
+	echo_stderr "No release specified (-r)"
+	show_usage_and_exit
+fi
+
+
+if [ -z "$architecture" ]; then
+	echo_stderr "No architecture specified (-a)"
+	show_usage_and_exit
+fi
+
+if [ -z "$target_directory" ]; then
+	echo_stderr "No target directory specified"
+	show_usage_and_exit
+fi
+
+
+if test ! -d "$target_directory"; then 
+	echo "ERROR: target directory '$target_directory' does not exist"
+	exit 2
+fi
