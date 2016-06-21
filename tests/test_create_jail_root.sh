@@ -16,6 +16,7 @@ function assert_grep () {
 	done
 }
 
+# clear test root
 rm -rf "$TEST_ROOT"
 mkdir -p "$TEST_ROOT"
 
@@ -66,9 +67,10 @@ assert "$CMD" "Release: 10.3-RELEASE\nArchitecture: amd64\nTarget directory: $TE
 
 assert_end '"Parmeters are parsed correctly"'
 
-FTP_DIR="ftp://ftp.de.freebsd.org/pub/FreeBSD/releases/amd64/amd64/10.3-RELEASE"
 
-CMD="$BIN/create_jail_root -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
+# check if files are downloaded correctly
+FTP_DIR="ftp://ftp.de.freebsd.org/pub/FreeBSD/releases/amd64/amd64/10.3-RELEASE"
+CMD="$BIN/create_jail_root -D -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
 assert_grep "$CMD" "Downloading $FTP_DIR/MANIFEST" "Downloading $FTP_DIR/base.txz" "Downloading $FTP_DIR/lib32.txz"
 assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/MANIFEST"
 assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/base.txz"
@@ -76,13 +78,30 @@ assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/lib32.txz"
 
 assert_end '"Correct package sets are downloaded"'
 
+# check if verification works
+CMD="$BIN/create_jail_root -V -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
+assert_grep "$CMD" "Verifying checksum for base.txz" "Verifying checksum for lib32.txz"
+base_pkg="/var/tmp/amd64/10.3-RELEASE/base.txz"
+cp "$base_pkg" "$base_pkg.bak"
+echo make_checksum_bad >> "$base_pkg"
+assert_raises "$CMD" 4
+
+mv "$base_pkg.bak" "$base_pkg"
+
+assert_end '"Packages are verified correctly"'
 
 
-CMD="$BIN/create_jail_root -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
+# Check if packages are extracted correctly
+CMD="$BIN/create_jail_root -E -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
 assert_grep "$CMD" "Extracting base" "Extracting lib32"
 assert_raises "test -f \"$TEST_ROOT/new_root/sbin/sha256\""
 assert_raises "test -f \"$TEST_ROOT/new_root/usr/lib32/libc.so\""
 
+cp "$base_pkg" "$base_pkg.bak"
+echo make_file_corrupt >> "$base_pkg"
+assert_raises "$CMD" 5
+
+mv "$base_pkg.bak" "$base_pkg"
 assert_end '"Packages have been extracted"'
 
 
