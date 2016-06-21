@@ -4,6 +4,13 @@ echo_stderr () {
 	echo "$*" >&2
 }
 
+echo_verbose () {
+	if [ $verbose -ne 0 ]; then
+		echo "$*"
+	fi
+}
+
+
 show_usage_and_exit ()  {
 	echo_stderr "Usage: $0 <target-directory>"
 	exit 1
@@ -12,15 +19,23 @@ show_usage_and_exit ()  {
 target_directory=""
 release=""
 architecture=""
+verbose=0
+dryrun=0
 
 # parse options
-while getopts "a:r:" opt; do
+while getopts "a:nr:v" opt; do
 	case $opt in
 		a)
 			architecture="$OPTARG"
 			;;
 		r)
 			release="$OPTARG"
+			;;
+		v)
+			verbose=1
+			;;
+		n)
+			dryrun=1
 			;;
 		\?)
 			show_usage_and_exit
@@ -42,20 +57,26 @@ if [ -z "$release" ]; then
 	echo_stderr "No release specified (-r)"
 	show_usage_and_exit
 fi
-
+echo_verbose "Release: $release"
 
 if [ -z "$architecture" ]; then
 	echo_stderr "No architecture specified (-a)"
 	show_usage_and_exit
 fi
+echo_verbose "Architecture: $architecture"
 
 if [ -z "$target_directory" ]; then
 	echo_stderr "No target directory specified"
 	show_usage_and_exit
 fi
-
+echo_verbose "Target directory: $target_directory"
 
 if test ! -d "$target_directory"; then 
 	echo "ERROR: target directory '$target_directory' does not exist"
 	exit 2
+fi
+
+if [ $dryrun -ne 0 ]; then
+	echo "Dry run only - not doing anything"
+	exit 0
 fi
