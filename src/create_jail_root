@@ -55,16 +55,22 @@ mirror="ftp://ftp.de.freebsd.org"
 packages="base lib32"
 cache_dir=/var/tmp
 
+BIN=$(dirname "$0")
+
 do_all=1
 do_download=0
 do_verify=0
 do_extract=0
+do_update=0
 
 # parse options
-while getopts "a:nr:vDVE" opt; do
+while getopts "a:nr:vDEUV" opt; do
 	case $opt in
 		a)
 			architecture="$OPTARG"
+			;;
+		n)
+			dryrun=1
 			;;
 		r)
 			release="$OPTARG"
@@ -72,20 +78,21 @@ while getopts "a:nr:vDVE" opt; do
 		v)
 			verbose=1
 			;;
-		n)
-			dryrun=1
-			;;
 		D) 
 			do_all=0
 			do_download=1
 			;;
-		V)
-			do_all=0
-			do_verify=1
-			;;
 		E)
 			do_all=0
 			do_extract=1
+			;;
+		U)
+			do_all=0
+			do_update=1
+			;;
+		V)
+			do_all=0
+			do_verify=1
 			;;
 		\?)
 			show_usage_and_exit
@@ -169,7 +176,20 @@ if [ $do_all -eq 1 -o $do_extract -eq 1 ]; then
 			exit 5
 		fi
 	done
+	# save architecture for future reference
+	echo $architecture > "$target_directory/etc/jail_architecture"
+
 fi
 
-
+if [ $do_all -eq 1 -o $do_update -eq 1 ]; then
+	echo "Running freebsd-update"
+	old_version=$("$target_directory/bin/freebsd-version" -u)
+	PAGER=cat "$BIN/freebsd-update-jail" $target_directory fetch install > /dev/null
+	if [ $? -ne 0 ]; then
+		echo_stderr "freebsd-update failed"
+		exit 6
+	fi
+	new_version=$("$target_directory/bin/freebsd-version" -u)
+	echo "Updated $target_directory from $old_version to $new_version"
+fi
 

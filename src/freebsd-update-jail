@@ -1,0 +1,19 @@
+#!/bin/sh
+
+if [ $# -lt 1 ]; then
+	echo "Usage: freebsd-update-jail <jail-directory> <freebsd-update parameters>" >&2
+	exit 1
+fi
+
+target_directory="$1"
+shift
+
+if [ ! -f "$target_directory/etc/jail_architecture" ]; then
+	echo "Cannot open $target_directory/etc/jail_architecture - does not seem to be a jail created by create_jail_root" >&2
+	exit 1
+fi
+
+architecture=$(cat "$target_directory/etc/jail_architecture")
+release=$("$target_directory/bin/freebsd-version" -u | grep -E -o '.*-RELEASE')
+UNAME_m=$architecture freebsd-update --currently-running $release -b $target_directory $*
+exit $?
