@@ -2,14 +2,12 @@ TEST_ROOT=/var/tmp/root_creation_tests
 POOL=pool/nosnapshots
 BIN="$work_dir/../src"
 
-rm -rf "$TEST_ROOT"
-mkdir -p "$TEST_ROOT"
 
 
 function assert_grep () {
 	cmd=$1
 	shift
-	output=$(eval $cmd)
+	output=$(eval $cmd 2>&1)
 
 	for pattern in "$@"; do
 		assert_raises "grep  -E -e \"$pattern\" <<< \"$output\"" 0

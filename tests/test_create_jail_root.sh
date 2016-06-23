@@ -8,6 +8,8 @@ work_dir=$(dirname "$0")
 . "$work_dir/lib.sh"
 
 destroy_root_fs "$TEST_ROOT/new_root"
+rm -rf "$TEST_ROOT"
+mkdir -p "$TEST_ROOT"
 create_root_fs "$TEST_ROOT/new_root"
 
 # check if files are downloaded correctly
@@ -66,6 +68,17 @@ assert_grep "$CMD" "Running freebsd-update"
 
 assert_end '"Root has been updated using freebsd-update"'
 
+
+# make sure FreeBSD update is run for verifying
+CMD="$BIN/create_jail_root -C -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/new_root\""
+snapshot_root_fs "$TEST_ROOT/new_root"
+echo "invalidate" >> "$TEST_ROOT/new_root/bin/sh"
+assert_raises "$CMD" 7
+
+rollback_root_fs "$TEST_ROOT/new_root"
+assert_raises "$CMD" 0
+
+assert_end '"Root has been verified using freebsd-update"'
 
 destroy_root_fs "$TEST_ROOT/new_root"
 

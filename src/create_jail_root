@@ -46,9 +46,19 @@ verify_checksum () {
 
 }
 
+get_release_version () {
+	grep -E -o '^[0-9]+\.[0-9]+'
+}
+
+get_host_release () {
+	uname -r | get_release_version
+}
+
+
+
 target_directory=""
-release=""
-architecture=""
+release=$(get_host_release)
+architecture=$(uname -m)
 verbose=0
 dryrun=0
 mirror="ftp://ftp.de.freebsd.org"
@@ -62,12 +72,16 @@ do_download=0
 do_verify=0
 do_extract=0
 do_update=0
+do_verify_root=0
 
 # parse options
-while getopts "a:nr:vDEUV" opt; do
+while getopts "a:cnr:vCDEUV" opt; do
 	case $opt in
 		a)
 			architecture="$OPTARG"
+			;;
+		c)
+			do_verify_root=1
 			;;
 		n)
 			dryrun=1
@@ -77,6 +91,10 @@ while getopts "a:nr:vDEUV" opt; do
 			;;
 		v)
 			verbose=1
+			;;
+		C)
+			do_all=0
+			do_verify_root=1
 			;;
 		D) 
 			do_all=0
@@ -114,6 +132,7 @@ if [ -z "$release" ]; then
 	echo_stderr "No release specified (-r)"
 	show_usage_and_exit
 fi
+release=$(echo $release | get_release_version)-RELEASE
 echo_verbose "Release: $release"
 
 if [ -z "$architecture" ]; then
@@ -191,5 +210,15 @@ if [ $do_all -eq 1 -o $do_update -eq 1 ]; then
 	fi
 	new_version=$("$target_directory/bin/freebsd-version" -u)
 	echo "Updated $target_directory from $old_version to $new_version"
+fi
+
+
+if [ $do_verify_root -eq 1 ]; then
+	echo "Verifying installed root using freebsd-update"
+	PAGER=cat "$BIN/freebsd-update-jail" $target_directory IDS
+	if [ $? -ne 0 ]; then
+		echo_stderr "freebsd-update failed"
+		exit 7
+	fi
 fi
 
