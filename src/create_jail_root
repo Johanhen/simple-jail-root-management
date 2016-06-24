@@ -17,9 +17,10 @@ Usage: $(basename $0) [options] <target-directory>
 	Options:
 	-a <architecture>: specify architecture to download and install.  
 	        Default: the host's architecture as provided by uname -m
-	-c: use freebsd-update IDS to check for modifications. Default is off
+	-f <files>: comma-separated list of files to be copied from host
+	        Default: /etc/localtime,/etc/resolv.conf
 	-n: dry run - print parameters (with -v) and check target-directory but
-	        don't actually do anythin
+	        don't actually do anything
 	-p <packages>: comma-separated list of packages to download 
 	        (e.g.  base,src,lib32) - no spaces, no file extensions
 		Default: base
@@ -28,6 +29,8 @@ Usage: $(basename $0) [options] <target-directory>
 		Note: only -RELEASE version are usually provided so the -RELEASE
 		will automatically be appended if you specify just 10.3
 		Default: the host's release as provided by uname -r
+	-s: compare installed files to sha256 checksums using freebsd-update IDS
+	        Default: off
 	-v: verbose, print all parameters before starting to download
 
 	The following uppercase options specify to only execute the specified step - mostly for debugging
@@ -35,7 +38,8 @@ Usage: $(basename $0) [options] <target-directory>
 	-V: verify downloaded files
 	-E: extract
 	-U: update using freebsd-update
-	-C: check using freebsd-update IDS
+	-S: check using freebsd-update IDS
+	-F: copy host files
 EOF
 	exit 1
 }
@@ -88,6 +92,7 @@ dryrun=0
 mirror="ftp://ftp.de.freebsd.org"
 packages="base"
 cache_dir=/var/tmp
+files=/etc/localtime,/etc/resolv.conf
 
 BIN=$(dirname "$0")
 
@@ -99,13 +104,13 @@ do_update=0
 do_verify_root=0
 
 # parse options
-while getopts "a:cnp:r:vCDEUV" opt; do
+while getopts "a:f:np:r:svDEFSUV" opt; do
 	case $opt in
 		a)
 			architecture="$OPTARG"
 			;;
-		c)
-			do_verify_root=1
+		f)
+			files="$OPTARG"
 			;;
 		n)
 			dryrun=1
@@ -116,12 +121,11 @@ while getopts "a:cnp:r:vCDEUV" opt; do
 		r)
 			release="$OPTARG"
 			;;
+		s)
+			do_verify_root=1
+			;;
 		v)
 			verbose=1
-			;;
-		C)
-			do_all=0
-			do_verify_root=1
 			;;
 		D) 
 			do_all=0
@@ -130,6 +134,14 @@ while getopts "a:cnp:r:vCDEUV" opt; do
 		E)
 			do_all=0
 			do_extract=1
+			;;
+		F)
+			do_all=0
+			do_files=1
+			;;
+		S)
+			do_all=0
+			do_verify_root=1
 			;;
 		U)
 			do_all=0
@@ -172,12 +184,8 @@ if [ -z "$target_directory" ]; then
 	echo_stderr "No target directory specified"
 	show_usage_and_exit
 fi
-echo_verbose "Target directory: $target_directory"
 
-if test ! -d "$target_directory"; then 
-	echo "ERROR: target directory '$target_directory' does not exist"
-	exit 2
-fi
+echo_verbose "Target directory: $target_directory"
 
 echo_verbose "Mirror: $mirror"
 
@@ -188,6 +196,29 @@ if [ $verbose -ne 0 ]; then
 		echo_verbose " - $package"
 	done
 	unset IFS
+fi
+
+if [ $verbose -ne 0 ]; then
+	echo_verbose "Files to copy:"
+	IFS=,
+	for file in $files; do
+		echo_verbose " - $file"
+	done
+	unset IFS
+fi
+
+IFS=,
+for file in $files; do
+	if [ ! -r $file ]; then
+		echo_stderr "File $file should be copied to new root but does not exist or is not readable"
+		exit 1
+	fi
+done
+unset IFS
+
+if test ! -d "$target_directory"; then 
+	echo "ERROR: target directory '$target_directory' does not exist"
+	exit 2
 fi
 
 if [ $dryrun -ne 0 ]; then
@@ -256,4 +287,16 @@ if [ $do_verify_root -eq 1 ]; then
 		exit 7
 	fi
 fi
+
+if [ $do_all -eq 1 -o $do_files -eq 1 ]; then
+	echo "Copying files"
+	IFS=,
+	for file in $files; do
+		dir=$(dirname "$file")
+		mkdir -p "$target_directory/$dir"
+		cp "$file" "$target_directory/$file"
+	done
+	unset IFS
+fi
+
 

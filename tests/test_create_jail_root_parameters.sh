@@ -52,11 +52,18 @@ assert_raises "$CMD 2>&1 | grep 'does not exist'" 0
 
 assert_end '"fail and display error message if target directory does not exist"'
 
+echo "**** check if files to copy exist"
+CMD="$BIN/create_jail_root -n -f /etc/localtime,/etc/does_not_exist \"$TEST_ROOT/does_exist\""
+assert_raises "$CMD" 1
+assert_grep "$CMD 2>&1" 'File /etc/does_not_exist should be copied to new root but does not exist or is not readable'
+
+assert_end '"fail and display error message if files to copy do not exist"'
+
 
 echo "**** check if all parameters are parsed correctly"
-CMD="$BIN/create_jail_root -n -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/does_exist\""
+CMD="$BIN/create_jail_root -n -v -a amd64 -r 10.3-RELEASE -p base,lib32 -f /etc/localtime,/etc/resolv.conf,/etc/hosts \"$TEST_ROOT/does_exist\""
 assert_raises "$CMD" 0
-assert "$CMD" "Release: 10.3-RELEASE\nArchitecture: amd64\nTarget directory: $TEST_ROOT/does_exist\nMirror: ftp://ftp.de.freebsd.org\nPackages:\n - base\n - lib32\nDry run only - not doing anything"
+assert "$CMD" "Release: 10.3-RELEASE\nArchitecture: amd64\nTarget directory: $TEST_ROOT/does_exist\nMirror: ftp://ftp.de.freebsd.org\nPackages:\n - base\n - lib32\nFiles to copy:\n - /etc/localtime\n - /etc/resolv.conf\n - /etc/hosts\nDry run only - not doing anything"
 
 assert_end '"Parmeters are parsed correctly"'
 
