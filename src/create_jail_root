@@ -12,7 +12,31 @@ echo_verbose () {
 
 
 show_usage_and_exit ()  {
-	echo_stderr "Usage: $0 <target-directory>"
+	cat 1>&2 <<EOF 
+Usage: $(basename $0) [options] <target-directory>
+	Options:
+	-a <architecture>: specify architecture to download and install.  
+	        Default: the host's architecture as provided by uname -m
+	-c: use freebsd-update IDS to check for modifications. Default is off
+	-n: dry run - print parameters (with -v) and check target-directory but
+	        don't actually do anythin
+	-p <packages>: comma-separated list of packages to download 
+	        (e.g.  base,src,lib32) - no spaces, no file extensions
+		Default: base
+	-r <release>: specify the release to download and install 
+		(e.g.  10.3-RELEASE or 10.3).
+		Note: only -RELEASE version are usually provided so the -RELEASE
+		will automatically be appended if you specify just 10.3
+		Default: the host's release as provided by uname -r
+	-v: verbose, print all parameters before starting to download
+
+	The following uppercase options specify to only execute the specified step - mostly for debugging
+	-D: download
+	-V: verify downloaded files
+	-E: extract
+	-U: update using freebsd-update
+	-C: check using freebsd-update IDS
+EOF
 	exit 1
 }
 
@@ -62,7 +86,7 @@ architecture=$(uname -m)
 verbose=0
 dryrun=0
 mirror="ftp://ftp.de.freebsd.org"
-packages="base lib32"
+packages="base"
 cache_dir=/var/tmp
 
 BIN=$(dirname "$0")
@@ -75,7 +99,7 @@ do_update=0
 do_verify_root=0
 
 # parse options
-while getopts "a:cnr:vCDEUV" opt; do
+while getopts "a:cnp:r:vCDEUV" opt; do
 	case $opt in
 		a)
 			architecture="$OPTARG"
@@ -85,6 +109,9 @@ while getopts "a:cnr:vCDEUV" opt; do
 			;;
 		n)
 			dryrun=1
+			;;
+		p)
+			packages="$OPTARG"
 			;;
 		r)
 			release="$OPTARG"
@@ -156,9 +183,11 @@ echo_verbose "Mirror: $mirror"
 
 if [ $verbose -ne 0 ]; then
 	echo_verbose "Packages:"
+	IFS=,
 	for package in $packages; do
 		echo_verbose " - $package"
 	done
+	unset IFS
 fi
 
 if [ $dryrun -ne 0 ]; then
@@ -175,18 +204,23 @@ mkdir -p "$release_dir"
 
 if [ $do_all -eq 1 -o $do_download -eq 1 ]; then
 	download_file "$ftp_dir/MANIFEST" "$release_dir"
+	IFS=,
 	for package in $packages; do
 		download_file "$ftp_dir/$package.txz" "$release_dir"
 	done
+	unset IFS
 fi
 
 if [ $do_all -eq 1 -o $do_verify -eq 1 ]; then
+	IFS=,
 	for package in $packages; do
 		verify_checksum "$package.txz" "$release_dir"
 	done
+	unset IFS
 fi
 
 if [ $do_all -eq 1 -o $do_extract -eq 1 ]; then
+	IFS=,
 	for package in $packages; do
 		echo "Extracting $package"
 		tar xf "$release_dir/$package.txz" -C "$target_directory" 
@@ -195,6 +229,7 @@ if [ $do_all -eq 1 -o $do_extract -eq 1 ]; then
 			exit 5
 		fi
 	done
+	unset IFS
 	# save architecture for future reference
 	echo $architecture > "$target_directory/etc/jail_architecture"
 
@@ -215,9 +250,9 @@ fi
 
 if [ $do_verify_root -eq 1 ]; then
 	echo "Verifying installed root using freebsd-update"
-	PAGER=cat "$BIN/freebsd-update-jail" $target_directory IDS
-	if [ $? -ne 0 ]; then
-		echo_stderr "freebsd-update failed"
+	"$BIN/freebsd-update-jail" $target_directory IDS | grep 'but should have'
+	if [ $? -eq 0 ]; then
+		echo_stderr "freebsd-update failed to verify"
 		exit 7
 	fi
 fi

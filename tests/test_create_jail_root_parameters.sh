@@ -54,7 +54,7 @@ assert_end '"fail and display error message if target directory does not exist"'
 
 
 echo "**** check if all parameters are parsed correctly"
-CMD="$BIN/create_jail_root -n -v -a amd64 -r 10.3-RELEASE \"$TEST_ROOT/does_exist\""
+CMD="$BIN/create_jail_root -n -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/does_exist\""
 assert_raises "$CMD" 0
 assert "$CMD" "Release: 10.3-RELEASE\nArchitecture: amd64\nTarget directory: $TEST_ROOT/does_exist\nMirror: ftp://ftp.de.freebsd.org\nPackages:\n - base\n - lib32\nDry run only - not doing anything"
 
