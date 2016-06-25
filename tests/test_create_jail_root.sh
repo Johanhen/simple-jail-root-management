@@ -3,7 +3,7 @@
 #stop after first test failure
 export STOP=1
 
-do_all=0
+do_all=1
 
 do_setup=1
 test_download=1
@@ -41,18 +41,26 @@ fi
 if [ $test_download -eq 1 ]; then
 	# check if files are downloaded correctly
 	FTP_DIR="ftp://ftp.de.freebsd.org/pub/FreeBSD/releases/amd64/amd64/10.3-RELEASE"
+
+	begin_test "Downloading unknown packages fails"
+	CMD="$BIN/create_jail_root -D -v -a amd64 -r 10.3-RELEASE -p unknown,base,lib32 \"$TEST_ROOT/new_root\""
+	assert_raises "$CMD" 3
+	end_test
+
+
+	begin_test "Correct package sets are downloaded"
 	CMD="$BIN/create_jail_root -D -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/new_root\""
 	assert_grep "$CMD" "Downloading $FTP_DIR/MANIFEST" "Downloading $FTP_DIR/base.txz" "Downloading $FTP_DIR/lib32.txz"
 	assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/MANIFEST"
 	assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/base.txz"
 	assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/lib32.txz"
-
-	assert_end '"Correct package sets are downloaded"'
+	end_test
 fi
 
 
 
 if [ $test_verification -eq 1 ]; then
+	begin_test "Packages are verified correctly"
 	# check if verification works
 	CMD="$BIN/create_jail_root -V -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/new_root\""
 	assert_grep "$CMD" "Verifying checksum for base.txz" "Verifying checksum for lib32.txz"
@@ -63,12 +71,13 @@ if [ $test_verification -eq 1 ]; then
 	assert_raises "$CMD" 4
 	### restore original file
 	mv "$base_pkg.bak" "$base_pkg"
-	assert_end '"Packages are verified correctly"'
+	end_test
 fi
 
 
 
 if [ $test_extract -eq 1 ]; then
+	begin_test "Packages have been extracted"
 	# Check if packages are extracted correctly
 	CMD="$BIN/create_jail_root -E -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/new_root\""
 
@@ -86,26 +95,29 @@ if [ $test_extract -eq 1 ]; then
 	assert_grep "$CMD" "Extracting base" "Extracting lib32"
 	assert_raises "test -f \"$TEST_ROOT/new_root/sbin/sha256\""
 	assert_raises "test -f \"$TEST_ROOT/new_root/usr/lib32/libc.so\""
-	assert_end '"Packages have been extracted"'
+	end_test
 fi
 
 
 
 if [ $test_update -eq 1 ]; then
+	begin_test "Architecture has been stored in /etc/jail_architecture"
 	# make sure architecture is saved
 	assert "cat \"$TEST_ROOT/new_root/etc/jail_architecture\"" "amd64"
-	assert_end '"Architecture has been stored in /etc/jail_architecture"'
+	end_test
 
+	begin_test "Root has been updated using freebsd-update"
 	# make sure FreeBSD update is run
 	CMD="$BIN/create_jail_root -U -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/new_root\""
 	assert_grep "$CMD" "Running freebsd-update"
 
-	assert_end '"Root has been updated using freebsd-update"'
+	end_test
 fi
 
 
 
 if [ $test_ids -eq 1 ]; then
+	begin_test "Root has been verified using freebsd-update"
 	# make sure FreeBSD update is run for verifying
 	CMD="$BIN/create_jail_root -S -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/new_root\""
 	snapshot_root_fs "$TEST_ROOT/new_root"
@@ -115,7 +127,7 @@ if [ $test_ids -eq 1 ]; then
 	rollback_root_fs "$TEST_ROOT/new_root"
 	assert_raises "$CMD" 0
 
-	assert_end '"Root has been verified using freebsd-update"'
+	end_test
 fi
 
 
