@@ -3,6 +3,8 @@
 #stop after first test failure
 export STOP=1
 
+do_all=0
+
 do_setup=1
 test_download=1
 test_verification=1
@@ -11,6 +13,17 @@ test_update=1
 test_ids=1
 test_copy_files=1
 do_cleanup=1
+
+if [ $do_all -eq 0 ]; then
+	do_setup=0
+	test_download=0
+	test_verification=1
+	test_extract=0
+	test_update=0
+	test_ids=0
+	test_copy_files=1
+	do_cleanup=0
+fi
 
 work_dir=$(dirname "$0")
 
@@ -108,6 +121,16 @@ fi
 
 
 if [ $test_copy_files -eq 1 ]; then
+	begin_test "Copying of file (-f)"
+
+	snapshot_root_fs "$TEST_ROOT/new_root"
+	CMD="$BIN/create_jail_root -F -v -a amd64 -r 10.3-RELEASE -p base,lib32 -f '' \"$TEST_ROOT/new_root\""
+	assert_raises "$CMD" 0
+	assert_raises "ls \"$TEST_ROOT/new_root/etc/localtime\"" 1
+	assert_raises "ls \"$TEST_ROOT/new_root/etc/resolv.conf\"" 1
+
+	rollback_root_fs "$TEST_ROOT/new_root"
+
 	# make sure files are copied
 	CMD="$BIN/create_jail_root -F -v -a amd64 -r 10.3-RELEASE -p base,lib32 -f /etc/localtime,/etc/resolv.conf,/etc/hosts \"$TEST_ROOT/new_root\""
 	assert_raises "$CMD" 0
@@ -115,7 +138,7 @@ if [ $test_copy_files -eq 1 ]; then
 	assert_raises "ls \"$TEST_ROOT/new_root/etc/resolv.conf\"" 0
 	assert_raises "ls \"$TEST_ROOT/new_root/etc/hosts\"" 0
 
-	assert_end '"Files have been copied correctly"'
+	end_test
 fi
 
 

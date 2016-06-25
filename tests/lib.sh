@@ -88,3 +88,15 @@ function rollback_root_fs () {
 		exit 1
 	fi
 }
+
+
+function begin_test () {
+	test_name=$1
+	echo "================================================================================"
+	echo "Starting test \"$test_name\""
+}
+
+function end_test () {
+	assert_end "\"$test_name\""
+}
+
