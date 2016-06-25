@@ -18,7 +18,8 @@ Usage: $(basename $0) [options] <target-directory>
 	-a <architecture>: specify architecture to download and install.  
 	        Default: the host's architecture as provided by uname -m
 	-f <files>: comma-separated list of files to be copied from host
-	        Default: /etc/localtime,/etc/resolv.conf
+	        Default: /etc/localtime,/etc/resolv.conf - use -f '' to turn
+		off copying of files
 	-n: dry run - print parameters (with -v) and check target-directory but
 	        don't actually do anything
 	-p <packages>: comma-separated list of packages to download 
@@ -188,6 +189,11 @@ fi
 echo_verbose "Target directory: $target_directory"
 
 echo_verbose "Mirror: $mirror"
+
+if [ -z "$packages" ]; then
+	echo_stderr "Package list must not be empty"
+	show_usage_and_exit
+fi
 
 if [ $verbose -ne 0 ]; then
 	echo_verbose "Packages:"

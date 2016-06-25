@@ -56,7 +56,6 @@ begin_test "check if files to copy exist"
 CMD="$BIN/create_jail_root -n -f /etc/localtime,/etc/does_not_exist \"$TEST_ROOT/does_exist\""
 assert_raises "$CMD" 1
 assert_grep "$CMD 2>&1" 'File /etc/does_not_exist should be copied to new root but does not exist or is not readable'
-
 end_test
 
 
@@ -65,6 +64,12 @@ begin_test "file list can be empty"
 CMD="$BIN/create_jail_root -n -f '' \"$TEST_ROOT/does_exist\""
 assert_raises "$CMD" 0
 end_test
+
+begin_test "package list must not be empty"
+CMD="$BIN/create_jail_root -n -p '' \"$TEST_ROOT/does_exist\""
+assert_raises "$CMD" 1
+end_test
+
 
 
 begin_test "check if all parameters are parsed correctly"
