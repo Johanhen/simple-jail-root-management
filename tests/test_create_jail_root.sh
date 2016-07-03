@@ -51,9 +51,9 @@ if [ $test_download -eq 1 ]; then
 	begin_test "Correct package sets are downloaded"
 	CMD="$BIN/create_jail_root -D -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/new_root\""
 	assert_grep "$CMD" "Downloading $FTP_DIR/MANIFEST" "Downloading $FTP_DIR/base.txz" "Downloading $FTP_DIR/lib32.txz"
-	assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/MANIFEST"
-	assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/base.txz"
-	assert_raises "test -f /var/tmp/amd64/10.3-RELEASE/lib32.txz"
+	assert_raises "test -f /var/tmp/create_jail_root/amd64/10.3-RELEASE/MANIFEST"
+	assert_raises "test -f /var/tmp/create_jail_root/amd64/10.3-RELEASE/base.txz"
+	assert_raises "test -f /var/tmp/create_jail_root/amd64/10.3-RELEASE/lib32.txz"
 	end_test
 fi
 
@@ -65,7 +65,7 @@ if [ $test_verification -eq 1 ]; then
 	CMD="$BIN/create_jail_root -V -v -a amd64 -r 10.3-RELEASE -p base,lib32 \"$TEST_ROOT/new_root\""
 	assert_grep "$CMD" "Verifying checksum for base.txz" "Verifying checksum for lib32.txz"
 	### make verification fail
-	base_pkg="/var/tmp/amd64/10.3-RELEASE/base.txz"
+	base_pkg="/var/tmp/create_jail_root/amd64/10.3-RELEASE/base.txz"
 	cp "$base_pkg" "$base_pkg.bak"
 	echo make_checksum_bad >> "$base_pkg"
 	assert_raises "$CMD" 4

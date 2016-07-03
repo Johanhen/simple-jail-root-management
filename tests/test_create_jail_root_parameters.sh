@@ -75,7 +75,18 @@ end_test
 begin_test "check if all parameters are parsed correctly"
 CMD="$BIN/create_jail_root -n -v -a amd64 -r 10.3-RELEASE -p base,lib32 -f /etc/localtime,/etc/resolv.conf,/etc/hosts \"$TEST_ROOT/does_exist\""
 assert_raises "$CMD" 0
-assert "$CMD" "Release: 10.3-RELEASE\nArchitecture: amd64\nTarget directory: $TEST_ROOT/does_exist\nMirror: ftp://ftp.de.freebsd.org\nPackages:\n - base\n - lib32\nFiles to copy:\n - /etc/localtime\n - /etc/resolv.conf\n - /etc/hosts\nDry run only - not doing anything"
+assert_grep "$CMD" "Release: 10.3-RELEASE" \
+	"Architecture: amd64" \
+	"Target directory: $TEST_ROOT/does_exist" \
+	"Mirror: ftp://ftp.de.freebsd.org" \
+	"Packages:" \
+	" - base" \
+	" - lib32" \
+	"Files to copy:" \
+	" - /etc/localtime" \
+	" - /etc/resolv.conf" \
+	" - /etc/hosts" \
+	"Dry run only - not doing anything"
 
 end_test
 

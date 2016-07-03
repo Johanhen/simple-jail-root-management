@@ -83,6 +83,234 @@ get_host_release () {
 	uname -r | get_release_version
 }
 
+parse_options () {
+
+	while getopts "a:f:np:r:svDEFSUV" opt; do
+		case $opt in
+			a)
+				architecture="$OPTARG"
+				;;
+			f)
+				files="$OPTARG"
+				;;
+			n)
+				dryrun=1
+				;;
+			p)
+				packages="$OPTARG"
+				;;
+			r)
+				release="$OPTARG"
+				;;
+			s)
+				do_verify_root=1
+				;;
+			v)
+				verbose=1
+				;;
+			D) 
+				do_all=0
+				do_download=1
+				;;
+			E)
+				do_all=0
+				do_extract=1
+				;;
+			F)
+				do_all=0
+				do_files=1
+				;;
+			S)
+				do_all=0
+				do_verify_root=1
+				;;
+			U)
+				do_all=0
+				do_update=1
+				;;
+			V)
+				do_all=0
+				do_verify=1
+				;;
+			\?)
+				show_usage_and_exit
+				;;
+			:)
+				echo_stderr "Option -$OPTARG requires an argument."
+				show_usage_and_exit
+				;;
+		esac
+	done
+
+	shift "$((OPTIND-1))" # Shift off the options and optional --.
+
+	if [ $# -eq 1 ]; then
+		target_directory=$1
+	fi
+}
+
+validate_option_release () {
+	if [ -z "$release" ]; then
+		echo_stderr "No release specified (-r)"
+		show_usage_and_exit
+	fi
+	release=$(echo $release | get_release_version)-RELEASE
+	echo_verbose "Release: $release"
+
+}
+
+validate_option_architecture () {
+	if [ -z "$architecture" ]; then
+		echo_stderr "No architecture specified (-a)"
+		show_usage_and_exit
+	fi
+	echo_verbose "Architecture: $architecture"
+
+}
+
+validate_option_target_directory () {
+	if [ -z "$target_directory" ]; then
+		echo_stderr "No target directory specified"
+		show_usage_and_exit
+	fi
+
+	echo_verbose "Target directory: $target_directory"
+
+	if test ! -d "$target_directory"; then 
+		echo "ERROR: target directory '$target_directory' does not exist"
+		exit 2
+	fi
+
+}
+
+validate_option_mirror () {
+	echo_verbose "Mirror: $mirror"
+
+}
+
+validate_option_packages () {
+	if [ -z "$packages" ]; then
+		echo_stderr "Package list must not be empty"
+		show_usage_and_exit
+	fi
+
+	if [ $verbose -ne 0 ]; then
+		echo_verbose "Packages:"
+		IFS=,
+		for package in $packages; do
+			echo_verbose " - $package"
+		done
+		unset IFS
+	fi
+
+}
+
+
+validate_option_files () {
+	if [ $verbose -ne 0 ]; then
+		echo_verbose "Files to copy:"
+		IFS=,
+		for file in $files; do
+			echo_verbose " - $file"
+		done
+		unset IFS
+	fi
+
+	IFS=,
+	for file in $files; do
+		if [ ! -r $file ]; then
+			echo_stderr "File $file should be copied to new root but does not exist or is not readable"
+			exit 1
+		fi
+	done
+	unset IFS
+
+}
+
+download_packages () {
+	ftp_dir="$mirror/pub/FreeBSD/releases/$architecture/$architecture/$release"
+
+	mkdir -p "$downloads_dir"
+
+	download_file "$ftp_dir/MANIFEST" "$downloads_dir"
+	IFS=,
+	for package in $packages; do
+		download_file "$ftp_dir/$package.txz" "$downloads_dir"
+	done
+	unset IFS
+
+}
+
+verify_packages () {
+	IFS=,
+	for package in $packages; do
+		verify_checksum "$package.txz" "$downloads_dir"
+	done
+	unset IFS
+
+}
+
+extract_package () {
+	package=$1
+	echo "Extracting $package"
+	tar xf "$downloads_dir/$package.txz" -C "$target_directory" 
+	if [ $? -ne 0 ]; then
+		echo_stderr "Unable to extract $downloads_dir/$package.txz"
+		exit 5
+	fi
+}
+
+
+extract_packages () {
+	IFS=,
+	for package in $packages; do
+		extract_package $package
+	done
+	unset IFS
+
+}
+
+save_architecture () {
+	# save architecture for use by freebsd-update-jail
+	echo $architecture > "$target_directory/etc/jail_architecture"
+}
+
+update_root () {
+	echo "Running freebsd-update"
+	old_version=$("$target_directory/bin/freebsd-version" -u)
+	PAGER=cat "$BIN/freebsd-update-jail" $target_directory fetch install > /dev/null
+	if [ $? -ne 0 ]; then
+		echo_stderr "freebsd-update failed"
+		exit 6
+	fi
+	new_version=$("$target_directory/bin/freebsd-version" -u)
+	echo "Updated $target_directory from $old_version to $new_version"
+
+}
+
+
+verify_root () {
+	echo "Verifying installed root using freebsd-update"
+	"$BIN/freebsd-update-jail" $target_directory IDS | grep 'but should have'
+	if [ $? -eq 0 ]; then
+		echo_stderr "freebsd-update failed to verify"
+		exit 7
+	fi
+
+}
+
+
+copy_files () {
+	echo "Copying files"
+	IFS=,
+	for file in $files; do
+		dir=$(dirname "$file")
+		mkdir -p "$target_directory/$dir"
+		cp "$file" "$target_directory/$file"
+	done
+	unset IFS
+
+}
 
 
 target_directory=""
@@ -92,7 +320,7 @@ verbose=0
 dryrun=0
 mirror="ftp://ftp.de.freebsd.org"
 packages="base"
-cache_dir=/var/tmp
+cache_dir=/var/tmp/create_jail_root
 files=/etc/localtime,/etc/resolv.conf
 
 BIN=$(dirname "$0")
@@ -103,206 +331,47 @@ do_verify=0
 do_extract=0
 do_update=0
 do_verify_root=0
+do_files=0
 
-# parse options
-while getopts "a:f:np:r:svDEFSUV" opt; do
-	case $opt in
-		a)
-			architecture="$OPTARG"
-			;;
-		f)
-			files="$OPTARG"
-			;;
-		n)
-			dryrun=1
-			;;
-		p)
-			packages="$OPTARG"
-			;;
-		r)
-			release="$OPTARG"
-			;;
-		s)
-			do_verify_root=1
-			;;
-		v)
-			verbose=1
-			;;
-		D) 
-			do_all=0
-			do_download=1
-			;;
-		E)
-			do_all=0
-			do_extract=1
-			;;
-		F)
-			do_all=0
-			do_files=1
-			;;
-		S)
-			do_all=0
-			do_verify_root=1
-			;;
-		U)
-			do_all=0
-			do_update=1
-			;;
-		V)
-			do_all=0
-			do_verify=1
-			;;
-		\?)
-			show_usage_and_exit
-			;;
-		:)
-			echo_stderr "Option -$OPTARG requires an argument."
-			show_usage_and_exit
-			;;
-	esac
-done
+parse_options "$@"
 
-shift "$((OPTIND-1))" # Shift off the options and optional --.
-
-if [ $# -eq 1 ]; then
-	target_directory=$1
-fi
-
-if [ -z "$release" ]; then
-	echo_stderr "No release specified (-r)"
-	show_usage_and_exit
-fi
-release=$(echo $release | get_release_version)-RELEASE
-echo_verbose "Release: $release"
-
-if [ -z "$architecture" ]; then
-	echo_stderr "No architecture specified (-a)"
-	show_usage_and_exit
-fi
-echo_verbose "Architecture: $architecture"
-
-if [ -z "$target_directory" ]; then
-	echo_stderr "No target directory specified"
-	show_usage_and_exit
-fi
-
-echo_verbose "Target directory: $target_directory"
-
-echo_verbose "Mirror: $mirror"
-
-if [ -z "$packages" ]; then
-	echo_stderr "Package list must not be empty"
-	show_usage_and_exit
-fi
-
-if [ $verbose -ne 0 ]; then
-	echo_verbose "Packages:"
-	IFS=,
-	for package in $packages; do
-		echo_verbose " - $package"
-	done
-	unset IFS
-fi
-
-if [ $verbose -ne 0 ]; then
-	echo_verbose "Files to copy:"
-	IFS=,
-	for file in $files; do
-		echo_verbose " - $file"
-	done
-	unset IFS
-fi
-
-IFS=,
-for file in $files; do
-	if [ ! -r $file ]; then
-		echo_stderr "File $file should be copied to new root but does not exist or is not readable"
-		exit 1
-	fi
-done
-unset IFS
-
-if test ! -d "$target_directory"; then 
-	echo "ERROR: target directory '$target_directory' does not exist"
-	exit 2
-fi
+validate_option_target_directory
+validate_option_architecture
+validate_option_release
+validate_option_mirror
+validate_option_packages
+validate_option_files
 
 if [ $dryrun -ne 0 ]; then
 	echo "Dry run only - not doing anything"
 	exit 0
 fi
 
-
-
-ftp_dir="$mirror/pub/FreeBSD/releases/$architecture/$architecture/$release"
-
-release_dir="$cache_dir/$architecture/$release"
-mkdir -p "$release_dir"
+downloads_dir="$cache_dir/$architecture/$release"
 
 if [ $do_all -eq 1 -o $do_download -eq 1 ]; then
-	download_file "$ftp_dir/MANIFEST" "$release_dir"
-	IFS=,
-	for package in $packages; do
-		download_file "$ftp_dir/$package.txz" "$release_dir"
-	done
-	unset IFS
+	download_packages
 fi
 
 if [ $do_all -eq 1 -o $do_verify -eq 1 ]; then
-	IFS=,
-	for package in $packages; do
-		verify_checksum "$package.txz" "$release_dir"
-	done
-	unset IFS
+	verify_packages
 fi
 
 if [ $do_all -eq 1 -o $do_extract -eq 1 ]; then
-	IFS=,
-	for package in $packages; do
-		echo "Extracting $package"
-		tar xf "$release_dir/$package.txz" -C "$target_directory" 
-		if [ $? -ne 0 ]; then
-			echo_stderr "Unable to extract $release_dir/$package.txz"
-			exit 5
-		fi
-	done
-	unset IFS
-	# save architecture for future reference
-	echo $architecture > "$target_directory/etc/jail_architecture"
-
+	extract_packages
+	save_architecture
 fi
 
 if [ $do_all -eq 1 -o $do_update -eq 1 ]; then
-	echo "Running freebsd-update"
-	old_version=$("$target_directory/bin/freebsd-version" -u)
-	PAGER=cat "$BIN/freebsd-update-jail" $target_directory fetch install > /dev/null
-	if [ $? -ne 0 ]; then
-		echo_stderr "freebsd-update failed"
-		exit 6
-	fi
-	new_version=$("$target_directory/bin/freebsd-version" -u)
-	echo "Updated $target_directory from $old_version to $new_version"
+	update_root
 fi
 
-
 if [ $do_verify_root -eq 1 ]; then
-	echo "Verifying installed root using freebsd-update"
-	"$BIN/freebsd-update-jail" $target_directory IDS | grep 'but should have'
-	if [ $? -eq 0 ]; then
-		echo_stderr "freebsd-update failed to verify"
-		exit 7
-	fi
+	verify_root
 fi
 
 if [ $do_all -eq 1 -o $do_files -eq 1 ]; then
-	echo "Copying files"
-	IFS=,
-	for file in $files; do
-		dir=$(dirname "$file")
-		mkdir -p "$target_directory/$dir"
-		cp "$file" "$target_directory/$file"
-	done
-	unset IFS
+	copy_files
 fi
 
 
