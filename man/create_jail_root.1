@@ -1,0 +1,163 @@
+.\"
+.\" comment
+.\"
+.\"
+.Dd July 3, 2016
+.Dt create_jail_root 1
+.Os
+.Sh NAME
+.Nm create_jail_root
+.Nd download FreeBSD userland into a directory
+.Sh SYNOPSIS
+.Nm
+.Op Fl a Ar architecture
+.Op Fl f Ar files
+.Op Fl p Ar components
+.Op Fl n
+.Op Fl s
+.Op Fl v
+.Ar target-directory
+.Sh DESCRIPTION
+The
+.Nm
+utility is a 
+.Xr sh 1
+script which will populate a given
+.Ar target-directory
+with a FreeBSD userland, downloading the appropriate binary distribution files
+from a FreeBSD mirror.
+.Pp
+.Nm
+will first use
+.Xr fetch 1
+to download the FreeBSD components specified using the
+.Fl p
+option to a temporary directory and check their checksums.
+Then it will extract the contents to the 
+.Ar target-directory
+and call
+.Xr freebsd-update 8
+to update the files to the latest patchlevel.
+.Pp
+If the 
+.Fl s
+option is provided,
+.Nm
+will also use 
+.Xr freebsd-update 8
+with the "IDS" parameter to verify the files using the hosts public key (which
+should be trustworthy).
+.Pp
+Finally, it will copy all files specified via
+.Fl f
+from the host to the 
+.Ar target-directory
+.
+.Pp
+The following options are available:
+.Bl -tag -width indent
+.It Fl a Ar architecture
+Specify the architecture (e.g. i386 or amd64) to download and install.  
+.Pp
+Defaults to the host's architecture as provided by 'uname -m'.
+.It Fl f Ar files
+Comma-separated list of files to be copied from host (only commas, no spaces) to
+the target directory. Paths are preserved relative to the 
+.Ar target-directory.
+.Pp
+Note that any path components that do not exist in the 
+.Ar target-directory
+yet (like '/usr/local/etc') will be created using
+.Xr mkdir 1
+and the new directories will have the calling user as owner and permissions set
+according to the user's umask. If this is not the desired outcome, you need to
+copy the files manually.
+.Pp
+Defaults to '/etc/localtime,/etc/resolv.conf'. Use -f '' to turn off copying of
+files
+.Pp
+.It Fl n
+Dry run only.
+.Nm
+will check its parameters but not do anything. Most useful in combination with 
+.Fl v
+to check if parameters are correct.
+.It Fl p Ar packages
+Comma-separated list of packages to download (e.g.  base,src,lib32) - no spaces
+and no file extensions are allowed. Available components vary from architecture
+to architecture, to get a list of available components, just go to the
+appropriate release dir on the FreeBSD mirror you are using.
+.Pp
+Default: base
+.It Fl r Ar release
+Specify the release to download and install. You can use only the version number
+or the version number and the suffix '-RELEASE' (e.g. 10.3 or 10.3-RELEASE).
+.Pp
+Note that only -RELEASE versions are usually provided as binaries, so the -RELEASE
+suffix will automatically be appended if you specify just the version number.
+.Pp
+Defaults to the host's release as provided by 'uname -r'
+.It Fl s
+Compare the installed files to sha256 checksums using the 'freebsd-update IDS'
+command.
+.Pp
+This option is disabled by default since it does take a long time and is a bit
+paranoid.
+.It Fl v
+Be verbose, printing all parameters before starting to do anything.
+.El
+.Pp
+The 
+.Ar target-directory
+argument must specify a directory that already exists. All files will be placed
+directly under this directory (which can also be a mountpoint, e.g. for a zfs
+filesystem).
+.Pp
+The following options allow to turn different stages of the script on or off:
+.Bl -tag -width indent
+.It Fl D
+download
+.It Fl V
+verify downloaded files
+.It Fl E
+extract
+.It Fl U
+update using freebsd-update
+.It Fl S
+check using freebsd-update IDS
+.It Fl F
+copy host files
+.El
+.Pp
+Specifying any of these options will enable only that stage and disable all
+other stages, unless they are explicitly enabled again using the appropriate
+options.
+.Pp
+These options are only intended for debugging and testing.
+.Sh EXIT STATUS
+The
+.Nm
+utility exits with one of the following values:
+.Bl -tag -width 4n
+.It 0
+Everything worked.
+.It 1
+Unrecognized or missing parameter.
+.It 2
+The target directory does not exist.
+.It 3
+Failed to download one or more files.
+.It 4
+Checksum comparison failed for one or more files.
+.It 5
+Unable to extract one of the downloaded components.
+.It 6
+Unable call 
+.Xr freebsd-update_jail 1
+on the 
+.Ar target-directory.
+.It 7
+Verification using "freebsd-update_jail IDS" failed.
+.El
+.Sh SEE ALSO
+.Xr freebsd-update_jail 1 
